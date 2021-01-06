@@ -1,0 +1,1 @@
+(import 'jcdc.jsonnet').configure
