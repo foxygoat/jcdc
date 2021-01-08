@@ -36,7 +36,7 @@ test: | $(O)  ## Run tests and generate a coverage file
 	go test -coverprofile=$(COVERFILE) ./...
 
 build-test: build  ## Run integration tests against a locally started jdbc server
-	out/jcdc & \
+	$(O)/jcdc & \
 		pid=$$!; \
 		go test . --url http://localhost:8080; \
 		kill $$pid
