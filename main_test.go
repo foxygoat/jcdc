@@ -17,12 +17,16 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-var urlFlag = flag.String("url", "", "URL to run integration tests against")
+var (
+	urlFlag    = flag.String("url", "", "URL to run integration tests against")
+	apiKeyFlag = flag.String("api-key", "", "API key")
+)
 
 type AppTestSuite struct {
 	suite.Suite
 	baseURL string
 	server  *httptest.Server
+	apiKey  string
 
 	origLogWriter io.Writer
 	origSemver    string
@@ -36,6 +40,7 @@ const (
 
 func (s *AppTestSuite) SetupSuite() {
 	s.baseURL = *urlFlag
+	s.apiKey = *apiKeyFlag
 	if s.baseURL == "" {
 		s.origLogWriter = log.Writer()
 		log.SetOutput(ioutil.Discard)
@@ -47,6 +52,7 @@ func (s *AppTestSuite) SetupSuite() {
 
 		s.server = httptest.NewServer(newHandler())
 		s.baseURL = s.server.URL
+		s.apiKey = config.APIKey
 	}
 }
 
@@ -63,11 +69,43 @@ func TestApp(t *testing.T) {
 	suite.Run(t, &AppTestSuite{})
 }
 
-func (s *AppTestSuite) TestHello() {
+func (s *AppTestSuite) TestRun() {
 	t := s.T()
-	body, status := httpGet(t, s.baseURL+"/hello")
+	payload := fmt.Sprintf(`{
+		"apiKey":  "%s",
+		"command": "printf 'Hello World!'"
+	}`, s.apiKey)
+	body, status := httpPost(t, s.baseURL+"/run", payload)
 	require.Equal(t, http.StatusOK, status)
 	require.Equal(t, "Hello World!", body)
+}
+
+func (s *AppTestSuite) TestRunErrJSON() {
+	t := s.T()
+	payload := `{ "BAD_JSON`
+	_, status := httpPost(t, s.baseURL+"/run", payload)
+	require.Equal(t, http.StatusBadRequest, status)
+}
+
+func (s *AppTestSuite) TestRunErrBadAPIKey() {
+	t := s.T()
+	payload := `{
+		"apiKey":  "BAD-API-KEY",
+		"command": "printf 'Hello World!'"
+	}`
+	_, status := httpPost(t, s.baseURL+"/run", payload)
+	require.Equal(t, http.StatusUnauthorized, status)
+}
+
+func (s *AppTestSuite) TestRunErrMissingCommand() {
+	t := s.T()
+	payload := fmt.Sprintf(`{
+		"apiKey":  "%s",
+		"command": "exit 13"
+	}`, s.apiKey)
+	body, status := httpPost(t, s.baseURL+"/run", payload)
+	require.Equal(t, http.StatusOK, status)
+	require.Equal(t, "error: exit status 13\n", body)
 }
 
 func (s *AppTestSuite) TestVersion() {
@@ -106,6 +144,11 @@ func (s *AppTestSuite) Test404() {
 func httpGet(t *testing.T, url string) (string, int) {
 	t.Helper()
 	return httpDo(t, http.MethodGet, url, "")
+}
+
+func httpPost(t *testing.T, url, body string) (string, int) {
+	t.Helper()
+	return httpDo(t, http.MethodPost, url, body)
 }
 
 func httpDo(t *testing.T, method, url, body string) (string, int) {

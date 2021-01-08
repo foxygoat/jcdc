@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 
+	"foxygo.at/s/errs"
 	"foxygo.at/s/httpe"
+	"github.com/alecthomas/kong"
 )
 
 var (
@@ -16,7 +19,17 @@ var (
 	CommitSha = "undefined"
 )
 
+var config struct {
+	APIKey string `help:"Secret API Key." env:"JCDC_API_KEY" required:""`
+}
+
+type payload struct {
+	APIKey  string `json:"apiKey"`
+	Command string `json:"command"` // e.g. kubecfg update https://github.com/foxygoat/foxtrot/..../ -A hostname=
+}
+
 func main() {
+	kong.Parse(&config, kong.Description("JCDC Server"))
 	fmt.Println("Listening on :8080 (accessible on http://localhost:8080)")
 	if err := http.ListenAndServe(":8080", newHandler()); err != nil {
 		log.Fatal(err)
@@ -26,12 +39,27 @@ func main() {
 func newHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/version", httpe.Must(httpe.Get, Version))
-	mux.Handle("/hello", httpe.Must(httpe.Get, Hello))
+	mux.Handle("/run", httpe.Must(httpe.Post, Run))
 	return logHTTP(mux)
 }
 
-func Hello(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello World!")
+func Run(w http.ResponseWriter, r *http.Request) error {
+	p := payload{}
+	defer r.Body.Close() //nolint: errcheck
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		return errs.Errorf("%v: JSON parse error: %v", httpe.ErrBadRequest, err)
+	}
+	if p.APIKey != config.APIKey {
+		return errs.Errorf("%v: bad API key", httpe.ErrUnauthorized)
+	}
+
+	cmd := exec.Command("/bin/sh", "-c", p.Command)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(w, "error: %s\n", err)
+	}
+	_, _ = w.Write(out)
+	return nil
 }
 
 func Version(w http.ResponseWriter, r *http.Request) error {
