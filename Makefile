@@ -1,6 +1,6 @@
 # --- Global -------------------------------------------------------------------
 O = out
-COVERAGE = 80
+COVERAGE = 85.7
 SEMVER ?= $(shell git describe --tags --dirty --always)
 COMMIT_SHA ?= $(shell git rev-parse --short HEAD)
 
@@ -36,9 +36,9 @@ test: | $(O)  ## Run tests and generate a coverage file
 	go test -coverprofile=$(COVERFILE) ./...
 
 build-test: build  ## Run integration tests against a locally started jdbc server
-	out/jcdc & \
+	$(O)/jcdc --api-key="secret" & \
 		pid=$$!; \
-		go test . --url http://localhost:8080; \
+		go test . --url http://localhost:8080 --api-key="secret"; \
 		kill $$pid
 
 check-coverage: test  ## Check that test coverage meets the required level
@@ -89,11 +89,11 @@ docker-build-release:
 		--platform linux/amd64,linux/arm/v7 .
 
 docker-run: docker-build
-	docker run --rm -it -p8080:8080 jcdc:latest
+	docker run --rm -it -p8080:8080 jcdc:latest --api-key="secret"
 
 docker-test: docker-build
-	docker run --rm --detach -p8083:8080 --name jcdc-test jcdc:latest
-	go test . --url http://localhost:8083; \
+	docker run --rm --detach -p8083:8080 --name jcdc-test jcdc:latest --api-key "secret"
+	go test . --url http://localhost:8083 --api-key "secret"; \
 		rc=$$?; \
 		docker kill jcdc-test; \
 		exit $$rc

@@ -15,6 +15,7 @@
     $.namespace,
     $.service,
     $.deployment,
+    $.secret,
     if $.config.hostname != null then $.ingress,
   ],
   namespace:: {
@@ -66,6 +67,10 @@
               image: 'foxygoat/jcdc:%s' % $.config.docker_tag,
               name: 'jcdc',
               ports: [{ containerPort: 8080, name: 'http', protocol: 'TCP' }],
+              env: [{
+                name: 'JCDC_API_KEY',
+                valueFrom: { secretKeyRef: { key: 'key', name: 'apikey' } },
+              }],
             },
           ],
         },
@@ -111,6 +116,17 @@
           secretName: 'jcdc-https-cert',
         },
       ],
+    },
+  },
+  secret:: {
+    apiVersion: 'v1',
+    kind: 'Secret',
+    metadata: {
+      namespace: 'jcdc',
+      name: 'apikey',
+    },
+    data: {
+      key: std.base64('secret'),  // ⚠️ needs to be overridden on a per-site basis
     },
   },
 }
