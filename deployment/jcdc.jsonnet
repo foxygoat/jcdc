@@ -3,8 +3,8 @@
     hostname: null,
     docker_tag: 'latest',
   },
-  configure(hostname=null, docker_tag=null)::
-    self {
+  configure(overlay={}, hostname=null, docker_tag=null)::
+    self + overlay + {
       config+: std.prune({
         hostname: hostname,
         docker_tag: docker_tag,
@@ -15,7 +15,6 @@
     $.namespace,
     $.service,
     $.deployment,
-    $.secret,
     if $.config.hostname != null then $.ingress,
   ],
   namespace:: {
@@ -69,7 +68,7 @@
               ports: [{ containerPort: 8080, name: 'http', protocol: 'TCP' }],
               env: [{
                 name: 'JCDC_API_KEY',
-                valueFrom: { secretKeyRef: { key: 'key', name: 'apikey' } },
+                valueFrom: { secretKeyRef: { key: 'apikey', name: 'jcdc' } },
               }],
             },
           ],
@@ -116,17 +115,6 @@
           secretName: 'jcdc-https-cert',
         },
       ],
-    },
-  },
-  secret:: {
-    apiVersion: 'v1',
-    kind: 'Secret',
-    metadata: {
-      namespace: 'jcdc',
-      name: 'apikey',
-    },
-    data: {
-      key: std.base64('secret'),  // ⚠️ needs to be overridden on a per-site basis
     },
   },
 }
