@@ -3,8 +3,7 @@ FROM golang:1.15-alpine AS builder
 WORKDIR /src
 RUN apk add git make
 
-# Build master of kubecfg for unreleased 32 bit changes
-RUN git clone https://github.com/bitnami/kubecfg
+RUN git clone -b open-via-importer https://github.com/camh-/kubecfg
 RUN make -C kubecfg
 
 ARG COMMIT_SHA
