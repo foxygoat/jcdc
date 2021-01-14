@@ -102,8 +102,8 @@ docker-test: docker-build
 
 # --- Deployment -------------------------------------------------------------------
 TLA_ARGS = \
-	$(if $(DEPLOY_TAG), --tla-str docker_tag=$(DEPLOY_TAG)) \
 	$(if $(DEPLOY_HOSTNAME), --tla-str hostname=$(DEPLOY_HOSTNAME)) \
+	--tla-str docker_tag=$(DOCKER_TAG) \
 	--tla-code-file overlay=deployment/$*/overlay.jsonnet
 
 deploy-%: | deployment/% deployment/%/secret.json deployment/%/overlay.jsonnet  ## Generate and deploy k8s manifests
@@ -111,6 +111,12 @@ deploy-%: | deployment/% deployment/%/secret.json deployment/%/overlay.jsonnet  
 
 show-deploy-%: | deployment/% deployment/%/secret.json deployment/%/overlay.jsonnet  ## Show k8s manifests that would be deployed
 	kubecfg show $(TLA_ARGS) deployment/main.jsonnet
+
+diff-deploy-%:  ## Show diff of k8s manifests between files and deployed
+	kubecfg diff $(TLA_ARGS) deployment/main.jsonnet
+
+undeploy-%:  ## Delete deployment
+	kubecfg delete $(TLA_ARGS) deployment/main.jsonnet
 
 deployment/%:
 	mkdir $@
@@ -137,7 +143,7 @@ COLOUR_GREEN  = $(shell tput setaf 2 2>/dev/null)
 COLOUR_WHITE  = $(shell tput setaf 7 2>/dev/null)
 
 help:
-	@awk -F ':.*## ' 'NF == 2 && $$1 ~ /^[A-Za-z0-9_-]+$$/ { printf "$(COLOUR_WHITE)%-30s$(COLOUR_NORMAL)%s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
+	@awk -F ':.*## ' 'NF == 2 && $$1 ~ /^[A-Za-z0-9%_-]+$$/ { printf "$(COLOUR_WHITE)%-30s$(COLOUR_NORMAL)%s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
 
 $(O):
 	@mkdir -p $@

@@ -14,6 +14,9 @@
   manifest: [
     $.namespace,
     $.service,
+    $.serviceAccount,
+    $.clusterRole,
+    $.clusterRoleBinding,
     $.deployment,
     if $.config.hostname != null then $.ingress,
   ],
@@ -38,6 +41,43 @@
       },
     },
   },
+  serviceAccount:: {
+    apiVersion: 'v1',
+    kind: 'ServiceAccount',
+    metadata: {
+      name: 'jcdc',
+      namespace: 'jcdc',
+    },
+  },
+  clusterRole:: {
+    apiVersion: 'rbac.authorization.k8s.io/v1',
+    kind: 'ClusterRole',
+    metadata: {
+      name: 'jcdc',
+    },
+    rules: [{
+      apiGroups: ['*'],
+      resources: ['*'],
+      verbs: ['*'],
+    }],
+  },
+  clusterRoleBinding:: {
+    apiVersion: 'rbac.authorization.k8s.io/v1',
+    kind: 'ClusterRoleBinding',
+    metadata: {
+      name: 'jcdc',
+    },
+    roleRef: {
+      apiGroup: 'rbac.authorization.k8s.io',
+      kind: 'ClusterRole',
+      name: 'jcdc',
+    },
+    subjects: [{
+      kind: 'ServiceAccount',
+      name: 'jcdc',
+      namespace: 'jcdc',
+    }],
+  },
   deployment:: {
     apiVersion: 'apps/v1',
     kind: 'Deployment',
@@ -61,9 +101,13 @@
           },
         },
         spec: {
+          serviceAccountName: 'jcdc',
+          automountServiceAccountToken: true,
           containers: [
             {
+              local policy(tag) = if tag == 'latest' || std.startsWith(tag, 'pr') then 'Always' else 'IfNotPresent',
               image: 'foxygoat/jcdc:%s' % $.config.docker_tag,
+              imagePullPolicy: policy($.config.docker_tag),
               name: 'jcdc',
               ports: [{ containerPort: 8080, name: 'http', protocol: 'TCP' }],
               env: [{
