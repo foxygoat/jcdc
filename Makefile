@@ -102,8 +102,8 @@ docker-test: docker-build
 
 # --- Deployment -------------------------------------------------------------------
 TLA_ARGS = \
-	$(if $(DEPLOY_TAG), --tla-str docker_tag=$(DEPLOY_TAG)) \
 	$(if $(DEPLOY_HOSTNAME), --tla-str hostname=$(DEPLOY_HOSTNAME)) \
+	--tla-str docker_tag=$(DOCKER_TAG) \
 	--tla-code-file overlay=deployment/$*/overlay.jsonnet
 
 deploy-%: | deployment/% deployment/%/secret.json deployment/%/overlay.jsonnet  ## Generate and deploy k8s manifests
