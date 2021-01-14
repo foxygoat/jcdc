@@ -105,7 +105,9 @@
           automountServiceAccountToken: true,
           containers: [
             {
+              local policy(tag) = if tag == 'latest' || std.startsWith(tag, 'pr') then 'Always' else 'IfNotPresent',
               image: 'foxygoat/jcdc:%s' % $.config.docker_tag,
+              imagePullPolicy: policy($.config.docker_tag),
               name: 'jcdc',
               ports: [{ containerPort: 8080, name: 'http', protocol: 'TCP' }],
               env: [{
