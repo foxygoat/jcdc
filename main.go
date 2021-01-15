@@ -56,7 +56,7 @@ func Run(w http.ResponseWriter, r *http.Request) error {
 	cmd := exec.Command("/bin/sh", "-c", p.Command)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Fprintf(w, "error: %s\n", err)
+		return errs.Errorf("%v: %v\n%s", httpe.ErrBadRequest, err, out)
 	}
 	_, _ = w.Write(out)
 	return nil
