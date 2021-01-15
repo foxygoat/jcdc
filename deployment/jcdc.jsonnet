@@ -2,12 +2,20 @@
   config:: {
     hostname: null,
     docker_tag: 'latest',
+    dev: '',
+    commit_sha: '',
+
+    // derived
+    nameSuffix: if self.dev != '' then '-' + self.dev else '',
+    hostPrefix: if self.dev != '' then self.dev + '.' else '',
   },
-  configure(overlay={}, hostname=null, docker_tag=null)::
+  configure(overlay={}, hostname=null, docker_tag=null, dev=null, commit_sha=null)::
     self + overlay + {
       config+: std.prune({
         hostname: hostname,
         docker_tag: docker_tag,
+        dev: dev,
+        commit_sha: commit_sha,
       }),
     },
 
@@ -31,13 +39,18 @@
     apiVersion: 'v1',
     kind: 'Service',
     metadata: {
-      name: 'jcdc',
       namespace: 'jcdc',
+      name: 'jcdc' + $.config.nameSuffix,
+      labels: {
+        app: 'jcdc',
+        dev: $.config.dev,
+      },
     },
     spec: {
       ports: [{ name: 'http', port: 8080 }],
       selector: {
         app: 'jcdc',
+        dev: $.config.dev,
       },
     },
   },
@@ -82,22 +95,28 @@
     apiVersion: 'apps/v1',
     kind: 'Deployment',
     metadata: {
+      namespace: 'jcdc',
+      name: 'jcdc' + $.config.nameSuffix,
       labels: {
         app: 'jcdc',
+        dev: $.config.dev,
       },
-      name: 'jcdc',
-      namespace: 'jcdc',
     },
     spec: {
       selector: {
         matchLabels: {
           app: 'jcdc',
+          dev: $.config.dev,
         },
       },
       template: {
         metadata: {
           labels: {
             app: 'jcdc',
+            dev: $.config.dev,
+          },
+          annotations: {
+            commit_sha: $.config.commit_sha,
           },
         },
         spec: {
@@ -124,23 +143,27 @@
     apiVersion: 'networking.k8s.io/v1',
     kind: 'Ingress',
     metadata: {
+      namespace: 'jcdc',
+      name: 'jcdc' + $.config.nameSuffix,
+      labels: {
+        app: 'jcdc',
+        dev: $.config.dev,
+      },
       annotations: {
         'cert-manager.io/cluster-issuer': 'letsencrypt',
         'traefik.ingress.kubernetes.io/router.entrypoints': 'https',
       },
-      name: 'jcdc',
-      namespace: 'jcdc',
     },
     spec: {
       rules: [
         {
-          host: $.config.hostname,
+          host: $.config.hostPrefix + $.config.hostname,
           http: {
             paths: [
               {
                 backend: {
                   service: {
-                    name: 'jcdc',
+                    name: 'jcdc' + $.config.nameSuffix,
                     port: {
                       name: 'http',
                     },
@@ -155,8 +178,8 @@
       ],
       tls: [
         {
-          hosts: [$.config.hostname],
-          secretName: 'jcdc-https-cert',
+          hosts: [$.config.hostPrefix + $.config.hostname],
+          secretName: 'jcdc' + $.config.nameSuffix + '-https-cert',
         },
       ],
     },

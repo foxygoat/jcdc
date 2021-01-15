@@ -101,10 +101,14 @@ docker-test: docker-build
 .PHONY: docker-build docker-build-release docker-run docker-test
 
 # --- Deployment -------------------------------------------------------------------
+LOCAL_OVERLAY = deployment/$*/overlay.jsonnet
+REMOTE_OVERLAY = https://github.com/foxygoat/jcdc/raw/$(COMMIT_SHA)/$(LOCAL_OVERLAY)
+OVERLAY = $(LOCAL_OVERLAY)
 TLA_ARGS = \
-	$(if $(DEPLOY_HOSTNAME), --tla-str hostname=$(DEPLOY_HOSTNAME)) \
 	--tla-str docker_tag=$(DOCKER_TAG) \
-	--tla-code-file overlay=deployment/$*/overlay.jsonnet
+	--tla-str commit_sha=$(COMMIT_SHA) \
+	$(if $(DEV), --tla-str dev=$(DEV)) \
+	--tla-code-file overlay=$(OVERLAY)
 
 deploy-%: | deployment/% deployment/%/secret.json deployment/%/overlay.jsonnet  ## Generate and deploy k8s manifests
 	kubecfg update $(TLA_ARGS) deployment/main.jsonnet
@@ -135,6 +139,26 @@ show-secret:  ## Show currently deployed JCDC secret for external use
 
 .PRECIOUS: deployment/% deployment/%/secret.json deployment/%/overlay.jsonnet
 .PHONY: show-secret
+
+# --- JCDC --------------------------------------------------------------------
+CURL_FLAGS = --silent --show-error --retry 3 --dump-header -
+JCDC_DEPLOY_PAYLOAD = \
+{ \
+	"command": "kubecfg update $(TLA_ARGS) https://github.com/foxygoat/jcdc/raw/$(COMMIT_SHA)/deployment/main.jsonnet", \
+	"apiKey": "$(JCDC_API_KEY)" \
+}
+jcdc-deploy-%: OVERLAY = $(REMOTE_OVERLAY)
+jcdc-deploy-%:
+	curl --data '$(JCDC_DEPLOY_PAYLOAD)' $(CURL_FLAGS) '$(JCDC_URL)'
+
+JCDC_UNDEPLOY_PAYLOAD = \
+{ \
+	"command": "kubecfg delete $(TLA_ARGS) https://github.com/foxygoat/jcdc/raw/$(COMMIT_SHA)/deployment/main.jsonnet", \
+	"apiKey": "$(JCDC_API_KEY)" \
+}
+jcdc-undeploy-%: OVERLAY = $(REMOTE_OVERLAY)
+jcdc-undeploy-%:
+	curl --data '$(JCDC_UNDEPLOY_PAYLOAD)' $(CURL_FLAGS) '$(JCDC_URL)'
 
 # --- Utilities ----------------------------------------------------------------
 COLOUR_NORMAL = $(shell tput sgr0 2>/dev/null)
