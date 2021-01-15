@@ -101,11 +101,11 @@ func (s *AppTestSuite) TestRunErrMissingCommand() {
 	t := s.T()
 	payload := fmt.Sprintf(`{
 		"apiKey":  "%s",
-		"command": "exit 13"
+		"command": "printf hello && exit 13"
 	}`, s.apiKey)
 	body, status := httpPost(t, s.baseURL+"/run", payload)
-	require.Equal(t, http.StatusOK, status)
-	require.Equal(t, "error: exit status 13\n", body)
+	require.Equal(t, http.StatusBadRequest, status)
+	require.Equal(t, "Bad Request: exit status 13\nhello\n", body)
 }
 
 func (s *AppTestSuite) TestVersion() {
